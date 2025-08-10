@@ -30,6 +30,8 @@ struct RayTracingMaterial
     float emissionStrength;
 
     float smoothness;
+    float metallic;
+    vec3 specularColor;
 };
 
 struct Sphere
@@ -66,7 +68,7 @@ const int RAY_COUNT_PER_PIXEL = 10;
 
 const Transform DEFAULT_TRANSFORM = Transform(vec3(0));
 
-const RayTracingMaterial DEFAULT_MATERIAL = RayTracingMaterial(vec3(1) , vec3(0) , 0.0 , 0.0);
+const RayTracingMaterial DEFAULT_MATERIAL = RayTracingMaterial(vec3(1) , vec3(0) , 0.0 , 0.0 , 0.0 , vec3(1));
 
 const Sphere DEFAULT_SPHERE = Sphere(1.0 , DEFAULT_TRANSFORM , DEFAULT_MATERIAL);
 
@@ -131,11 +133,11 @@ void UpdatePosition(inout Transform transform , vec3 newPos)
 
 
 //----- Sphere -----//
-void InitSphere(inout Sphere sphere , float r , vec3 color , vec3 emissionColor , float emissionStrength , float smoothness)
+void InitSphere(inout Sphere sphere , float r , vec3 color , vec3 emissionColor , float emissionStrength , float smoothness , float metallic , vec3 specularColor)
 {
     sphere.radius = r;
     sphere.transform.position = vec3(0);
-    sphere.material = RayTracingMaterial(color , emissionColor , emissionStrength , smoothness);
+    sphere.material = RayTracingMaterial(color , emissionColor , emissionStrength , smoothness , metallic , specularColor);
 }
 
 
@@ -282,12 +284,15 @@ vec3 Trace(Ray ray , inout uint seed)
 
             vec3 diffuseDir = normalize(info.normal + RandomDirection(seed));
             vec3 specularDir = normalize(reflect(ray.dir , info.normal));
-            ray.dir = mix(diffuseDir , specularDir , mat.smoothness);
+
+            bool isSpecularBounce = mat.metallic >= RandomValue01(seed);
+
+            ray.dir = mix(diffuseDir , specularDir , mat.smoothness * (isSpecularBounce ? 1.0 : 0.0));
 
             vec3 emittedLight = mat.emissionColor * mat.emissionStrength;
             incomingLight += emittedLight * rayColor;
 
-            rayColor *= mat.color;
+            rayColor *= mix(mat.color , mat.specularColor , isSpecularBounce ? 1.0 : 0.0);
         }
         else
         {
@@ -309,17 +314,17 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord)
     InitCamera(mainCamera , 0.3 , 60.0);
     InitSun(sun , vec3(3 , -1 , -2) , 1.0 , 1.0);
 
-    InitSphere(spheres[0] , 1.0 , vec3(1.0) , vec3(0.0) , 0.0 , 0.0);
-    InitSphere(spheres[1] , 0.7 , vec3(0.96, 0.18, 0.18) , vec3(0) , 0.0 , 0.0);
-    InitSphere(spheres[2] , 1.2 , vec3(0.17, 0.44, 0.91) , vec3(0.0) , 0.0 , 0.0);
-    InitSphere(spheres[3] , 20.0 , vec3(0.72, 0.38, 0.88) , vec3(0) , 0.0 , 0.0);
-    InitSphere(spheres[4] , 10.0 , vec3(0) , vec3(1) , 3.0 , 0.0);
+    InitSphere(spheres[0] , 1.0 , vec3(1.0) , vec3(0.0) , 0.0 , 0.0 , 0.0 , vec3(1));
+    InitSphere(spheres[1] , 0.7 , vec3(0.96, 0.18, 0.18) , vec3(0) , 0.0 , 0.0 , 0.0 , vec3(1));
+    InitSphere(spheres[2] , 1.2 , vec3(0.17, 0.44, 0.91) , vec3(0.0) , 0.0 , 0.0 , 0.0 , vec3(1));
+    InitSphere(spheres[3] , 20.0 , vec3(0.72, 0.38, 0.88) , vec3(0) , 0.0 , 0.0 , 0.0 , vec3(1));
+    InitSphere(spheres[4] , 10.0 , vec3(0) , vec3(1) , 1.6 , 0.0 , 0.0 , vec3(1));
 
-    UpdatePosition(spheres[0].transform , vec3(0 , 0 , 5));
-    UpdatePosition(spheres[1].transform , vec3(2 , -0.3 , 5));
-    UpdatePosition(spheres[2].transform , vec3(-2.5 , 0 , 5));
+    UpdatePosition(spheres[0].transform , vec3(cos(iTime) , sin(iTime / 3.0) + 1.0 , 5.0 + sin(iTime)));
+    UpdatePosition(spheres[1].transform , vec3(2.0 + cos(iTime / 1.1 + 0.3) , -0.3 , 5.0 + sin(iTime)));
+    UpdatePosition(spheres[2].transform , vec3(-2.5 + cos(iTime) , 0 , 5.0 + sin(iTime + 1.6)));
     UpdatePosition(spheres[3].transform , vec3(0 , -21 , 6));
-    UpdatePosition(spheres[4].transform , vec3(3 , 10 , 10));
+    UpdatePosition(spheres[4].transform , vec3(3 , 11 , 10));
 
 
     // 随机数种
